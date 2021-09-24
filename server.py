@@ -39,6 +39,9 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if method != "GET":
                 self.request.sendall("HTTP/1.1 405 Method Not Allowed\r\n\r\n".encode())
                 return
+            if "/../" in uri:
+                self.request.sendall(bytearray("HTTP/1.1 404 Not Found\r\n", "utf-8"))
+                return
             
             try:
                 if os.path.isdir("www" + uri):
