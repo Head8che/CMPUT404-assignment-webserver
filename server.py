@@ -1,5 +1,6 @@
 #  coding: utf-8 
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -25,14 +26,42 @@ import socketserver
 # run: python freetests.py
 
 # try: curl -v -X GET http://127.0.0.1:8080/
-
+# https://realpython.com/python-requests/#the-get-request
+# https://docs.python.org/3/library/stdtypes.html
 
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
-        self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        self.data = self.request.recv(1024).decode("utf-8")
+        try:
+            request = self.data.splitlines()[0].split()
+            method, uri = request[0], request[1]
+            if method != "GET":
+                self.request.sendall("HTTP/1.1 405 Method Not Allowed\r\n\r\n".encode())
+                return
+            
+            try:
+                if os.path.isdir("www" + uri):
+                    if uri.endswith("/"):  # Returning the default index
+                        uri += "index.html"
+                        uri = "www" + uri # to serve files from ./www
+                        with open(uri, "r") as f:
+                            self.request.sendall(bytearray("HTTP/1.1 200 OK\r\nContent-Type: text/%s; charset=utf-8\r\n\r\n"%(uri.split(".")[1])+f.read(), 'utf-8'))
+                    else:
+                        self.request.sendall(bytearray("HTTP/1.1 301 Moved Permanently\n", "utf-8"))
+                elif not os.path.isfile("www" + uri): # Not Found or File Not Found error message
+                    self.request.sendall(bytearray("HTTP/1.1 404 Not Found\r\n", "utf-8"))
+                    return
+                else:
+                    uri = "www" + uri
+                    with open(uri, "r") as f:
+                            self.request.sendall(bytearray("HTTP/1.1 200 OK\r\nContent-Type: text/%s; charset=utf-8\r\n\r\n"%(uri.split(".")[1])+f.read(), 'utf-8'))
+            except: # Not Found or File Not Found error message
+                self.request.sendall(bytearray("HTTP/1.1 404 Not Found\r\n", "utf-8"))
+                return
+        except: # Not Found or File Not Found error message
+            self.request.sendall(bytearray("HTTP/1.1 404 Not Found\r\n", "utf-8"))
+            return
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
